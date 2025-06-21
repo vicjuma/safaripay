@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model buses {
+  id            Int        @id @default(autoincrement())
+  name          String     @unique @db.VarChar(50)
+  front_seats   Int        @default(0)
+  left_rows     Int        @default(0)
+  left_columns  Int        @default(0)
+  right_rows    Int        @default(0)
+  right_columns Int        @default(0)
+  back_seats    Int        @default(0)
+  created_at    DateTime?  @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime?  @default(now()) @db.Timestamptz(6)
+  created_by    Int
+  users         users      @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+  payments      payments[]
+  seats         seats[]
+}
+
+model payments {
+  id                Int       @id @default(autoincrement())
+  bus_id            Int
+  seat_id           Int
+  amount            Decimal   @db.Decimal(10, 2)
+  payment_reference String?   @unique @db.VarChar(100)
+  payment_method    String    @db.VarChar(50)
+  passenger_phone   String?   @db.VarChar(20)
+  paid_at           DateTime? @default(now()) @db.Timestamptz(6)
+  created_by        Int
+  created_at        DateTime? @default(now()) @db.Timestamptz(6)
+  buses             buses     @relation(fields: [bus_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users             users     @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+  seats             seats     @relation(fields: [seat_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([bus_id], map: "idx_payments_bus_id")
+  @@index([seat_id], map: "idx_payments_seat_id")
+}
+
+model roles {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique @db.VarChar(50)
+  description String?
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  users       users[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model seats {
+  id            Int        @id @default(autoincrement())
+  bus_id        Int
+  seat_number   Int
+  position      String     @db.VarChar(20)
+  row_number    Int
+  column_number Int
+  status        String     @default("unpaid") @db.VarChar(20)
+  created_at    DateTime?  @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime?  @default(now()) @db.Timestamptz(6)
+  payments      payments[]
+  buses         buses      @relation(fields: [bus_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([bus_id, seat_number], map: "unique_seat_per_bus")
+  @@index([bus_id], map: "idx_seats_bus_id")
+}
+
+model users {
+  id         Int        @id @default(autoincrement())
+  username   String     @unique @db.VarChar(100)
+  email      String?    @unique @db.VarChar(255)
+  password   String     @db.VarChar(255)
+  role_id    Int
+  created_at DateTime?  @default(now()) @db.Timestamptz(6)
+  updated_at DateTime?  @default(now()) @db.Timestamptz(6)
+  buses      buses[]
+  payments   payments[]
+  roles      roles      @relation(fields: [role_id], references: [id], onUpdate: NoAction)
+}
